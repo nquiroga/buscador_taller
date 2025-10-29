@@ -65,6 +65,7 @@ with st.sidebar:
 
     st.subheader("Filtros Disponibles")
     st.markdown("""
+    - **Rango de años**: Selector deslizante para filtrar por período de publicación (1900-presente)
     - **Acceso abierto**: Filtrar por disponibilidad de PDF
     - **Cantidad de resultados**: Máximo 1000 por búsqueda
     - **Ordenamiento**: Por relevancia, citaciones o fecha
@@ -167,6 +168,21 @@ with col5:
         help="Filtrar por disponibilidad del PDF"
     )
 
+# Selector de rango de años
+from datetime import datetime
+current_year = datetime.now().year
+
+st.subheader("📅 Filtro por Año de Publicación")
+year_range = st.slider(
+    "Seleccione el rango de años",
+    min_value=1900,
+    max_value=current_year,
+    value=(2000, current_year),
+    step=1,
+    help="Arrastra los extremos para filtrar por año de publicación"
+)
+year_from, year_to = year_range
+
 # Botón de búsqueda
 search_button = st.button("🔍 Buscar", type="primary", width="stretch")
 
@@ -221,7 +237,9 @@ if search_button:
                     query=query,
                     max_results=max_results,
                     search_type=search_type,
-                    open_access_filter=open_access_filter
+                    open_access_filter=open_access_filter,
+                    year_from=year_from,
+                    year_to=year_to
                 )
 
                 if not results:
