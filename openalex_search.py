@@ -244,7 +244,7 @@ class OpenAlexSearcher:
             "oa_landing_url": landing_url or "",
         }
 
-    def get_all_results(self, query, max_results=50, search_type="general", open_access_filter="all"):
+    def get_all_results(self, query, max_results=50, search_type="general", open_access_filter="all", year_from=None, year_to=None):
         params = {
             "per_page": min(max_results, 200),
             "select": SELECT_FIELDS,
@@ -252,10 +252,25 @@ class OpenAlexSearcher:
             "cursor": "*",
             "search": query.strip(),
         }
+
+        # Construir filtros
+        filters = []
         if open_access_filter == "open_access_only":
-            params["filter"] = "is_oa:true"
+            filters.append("is_oa:true")
         elif open_access_filter == "closed_only":
-            params["filter"] = "is_oa:false"
+            filters.append("is_oa:false")
+
+        # Agregar filtro de años si se especifica
+        if year_from is not None and year_to is not None:
+            filters.append(f"publication_year:{year_from}-{year_to}")
+        elif year_from is not None:
+            filters.append(f"publication_year:>{year_from-1}")  # >= year_from
+        elif year_to is not None:
+            filters.append(f"publication_year:<{year_to+1}")    # <= year_to
+
+        # Unir filtros con coma (AND en OpenAlex)
+        if filters:
+            params["filter"] = ",".join(filters)
         out = []
         while len(out) < max_results:
             data = self._request(params)
