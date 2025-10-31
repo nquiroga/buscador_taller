@@ -63,7 +63,7 @@ class OpenAlexLogger:
             # Scopes necesarios para Google Sheets
             scopes = [
                 'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive.file'
+                'https://www.googleapis.com/auth/drive'
             ]
 
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
@@ -226,3 +226,4 @@ def log_search_event(query, search_params, results_df, pdf_stats=None):
     except Exception:
         # Completamente silencioso si falla
         pass
+
