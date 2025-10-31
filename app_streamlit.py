@@ -13,6 +13,13 @@ import zipfile
 import os
 import shutil
 
+# Logging anónimo de búsquedas (opcional, no rompe si falla)
+try:
+    from openalex_logger import log_search_event
+    LOGGING_AVAILABLE = True
+except ImportError:
+    LOGGING_AVAILABLE = False
+
 # Configuración de la página
 st.set_page_config(
     page_title="Búsqueda Académica - OpenAlex",
@@ -258,6 +265,24 @@ if search_button:
                     st.session_state['query'] = query
                     st.session_state['csv_filename'] = csv_filename
 
+                    # Logging anónimo (no bloquea si falla)
+                    if LOGGING_AVAILABLE:
+                        try:
+                            log_search_event(
+                                query=query,
+                                search_params={
+                                    'search_type': search_type,
+                                    'max_results': max_results,
+                                    'open_access_filter': open_access_filter,
+                                    'year_from': year_from,
+                                    'year_to': year_to,
+                                    'sort_by': sort_by
+                                },
+                                results_df=df
+                            )
+                        except Exception:
+                            pass  # Silencioso
+
                     st.success(f"✅ Se encontraron {len(df)} resultados")
                     st.info(f"📁 CSV guardado automáticamente: {csv_filename}")
 
@@ -376,6 +401,25 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
                         st.session_state['pdf_zip'] = zip_buffer.getvalue()
                         st.session_state['pdf_zip_name'] = f"pdfs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
                         st.session_state['pdf_stats'] = stats
+
+                        # Logging de descarga de PDFs (no bloquea si falla)
+                        if LOGGING_AVAILABLE and 'results' in st.session_state:
+                            try:
+                                log_search_event(
+                                    query=st.session_state.get('query', 'N/A'),
+                                    search_params={
+                                        'search_type': 'pdf_download',
+                                        'max_results': len(unique_dois),
+                                        'open_access_filter': 'N/A',
+                                        'year_from': '',
+                                        'year_to': '',
+                                        'sort_by': 'N/A'
+                                    },
+                                    results_df=st.session_state['results'],
+                                    pdf_stats=stats
+                                )
+                            except Exception:
+                                pass  # Silencioso
 
                         # Limpiar directorio temporal de PDFs
                         try:

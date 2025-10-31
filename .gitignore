@@ -1,0 +1,34 @@
+# Streamlit secrets (contiene credenciales)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# CSV generados por la app
+resultados_*.csv
+
+# PDFs descargados
+pdfs_*/
+*.pdf
+
+# Logs de debug
+debug_openalex/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
