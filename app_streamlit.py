@@ -7,6 +7,7 @@ Permite búsquedas avanzadas con operadores booleanos y exportación a Markdown
 import streamlit as st
 import pandas as pd
 from openalex_search import OpenAlexSearcher
+from openalex_logger import OpenAlexLogger
 from datetime import datetime
 import io
 import zipfile
@@ -523,5 +524,6 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
 # Footer
 st.divider()
 st.caption("Taller NotebookLM - 2025 | Datos de OpenAlex API")
+
 
 
