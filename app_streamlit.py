@@ -116,6 +116,18 @@ with st.sidebar:
 
     **Compatible con:** Streamlit Cloud y ejecución local
     """)
+st.markdown("---")
+st.subheader("🧩 Diagnóstico del Logger")
+
+if st.button("Probar conexión con Google Sheets"):
+   try:
+       logger = OpenAlexLogger()
+       if logger._initialized:
+          st.success("✅ Logger inicializado correctamente. Conectado a Google Sheets.")
+       else:
+          st.warning("⚠️ Logger no inicializado. Revisar secrets o permisos.")
+   except Exception as e:
+       st.error(f"❌ Error al crear el logger: {e}")
 
 # Formulario de búsqueda
 st.header("🔍 Nueva Búsqueda")
@@ -511,4 +523,5 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
 # Footer
 st.divider()
 st.caption("Taller NotebookLM - 2025 | Datos de OpenAlex API")
+
 
