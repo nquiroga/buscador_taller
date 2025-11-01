@@ -479,11 +479,18 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
     # Detalle de resultados individuales
     st.subheader("🔍 Ver Detalle Individual")
 
+    df = df.copy()
+    # Si title viene como lista, tomar el primer elemento; si viene NaN/None, reemplazar
+    df["__title"] = df["title"].apply(lambda v: (v[0] if isinstance(v, list) and v else v))
+    df["__title"] = df["__title"].fillna("(sin título)").astype(str).str.strip()
+    df.loc[df["__title"] == "", "__title"] = "(sin título)"
+
     selected_index = st.selectbox(
         "Seleccione un resultado para ver el detalle completo",
         options=range(len(df)),
-        format_func=lambda x: f"{x+1}. {df.iloc[x]['title'][:80]}..."
-    )
+        format_func=lambda i: f"{i+1}. {df.iloc[i]['__title'][:80]}…"
+        )
+
 
     if selected_index is not None:
         selected = df.iloc[selected_index]
@@ -504,3 +511,4 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
 # Footer
 st.divider()
 st.caption("Taller NotebookLM - 2025 | Datos de OpenAlex API")
+
