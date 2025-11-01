@@ -116,76 +116,10 @@ with st.sidebar:
     - Úsalos para lectura offline, NotebookLM, o agrégalos a Zotero manualmente
 
     **Compatible con:** Streamlit Cloud y ejecución local
+    _ℹ️ Esta aplicación registra un **log anónimo** de uso:_
+    solo se guardan estadísticas generales de las búsquedas y descargas,
+    sin datos personales ni información de los documentos.
     """)
-# ---------------------------------------------------------------------
-# 🧩 Diagnóstico fino del Logger (pegar al final del with st.sidebar:)
-# ---------------------------------------------------------------------
-import json
-import traceback
-import streamlit as st
-
-st.markdown("---")
-st.subheader("🧪 Diagnóstico avanzado del Logger")
-
-if st.button("Probar conexión y mostrar causa exacta"):
-    try:
-        # 1) Detectar qué variante de secrets está presente
-        using_table = "google_sheets" in st.secrets
-        using_json  = "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets
-        sheet_name  = st.secrets.get("google_sheets_name", "openalex_logs")
-        sheet_key   = st.secrets.get("google_sheets_key", "").strip()
-
-        st.write("Secrets detectados:", {
-            "tabla [google_sheets]": using_table,
-            "clave GOOGLE_SERVICE_ACCOUNT_JSON": using_json,
-            "google_sheets_name": sheet_name,
-            "google_sheets_key (ID)": ("(definido)" if sheet_key else "(vacío)"),
-        })
-
-        # 2) Preparar credenciales
-        if using_table:
-            creds_dict = dict(st.secrets["google_sheets"])
-        elif using_json:
-            creds_dict = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
-        else:
-            st.error("No hay ni [google_sheets] ni GOOGLE_SERVICE_ACCOUNT_JSON en secrets.")
-            st.stop()
-
-        # 3) Construir Credentials y cliente gspread
-        from google.oauth2.service_account import Credentials
-        import gspread
-
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        gc = gspread.authorize(creds)
-        st.success("✅ Autenticación con service account OK.")
-
-        # 4) Abrir la hoja (prioriza por KEY si está)
-        try:
-            if sheet_key:
-                sh = gc.open_by_key(sheet_key)
-                st.info("Se abrió la hoja por ID (google_sheets_key).")
-            else:
-                sh = gc.open(sheet_name)
-                st.info("Se abrió la hoja por nombre (google_sheets_name).")
-
-            wks = sh.sheet1
-            st.success("✅ Acceso a sheet1 OK.")
-
-            # 5) Intento controlado de escritura
-            test_row = ["_healthcheck_", "diag", "—", "—", 0, "all", "", "", "relevance",
-                        0, 0, 0, 0.0, False, 0, 0, 0, 0]
-            wks.append_row(test_row, value_input_option="USER_ENTERED")
-            st.success("✅ append_row() funcionó: se escribió una fila de diagnóstico.")
-        except Exception as e_sheet:
-            st.error(f"❌ Falló abrir la hoja o escribir: {type(e_sheet).__name__}: {e_sheet}")
-            st.code("".join(traceback.format_exc()))
-    except Exception as e:
-        st.error(f"❌ Error general en diagnóstico: {type(e).__name__}: {e}")
-        st.code("".join(traceback.format_exc()))
 
 # Formulario de búsqueda
 st.header("🔍 Nueva Búsqueda")
@@ -581,6 +515,7 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
 # Footer
 st.divider()
 st.caption("Taller NotebookLM - 2025 | Datos de OpenAlex API")
+
 
 
 
