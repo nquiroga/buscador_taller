@@ -5,9 +5,11 @@ GDPR-compliant: solo queries, parámetros y cifras agregadas
 """
 
 import os
+import json
 import hashlib
 from datetime import datetime
 from typing import Optional, Dict, Any
+
 import streamlit as st
 
 # Importaciones opcionales (no rompen si faltan)
@@ -17,6 +19,48 @@ try:
     GSPREAD_AVAILABLE = True
 except ImportError:
     GSPREAD_AVAILABLE = False
+
+
+# =============================================================================
+# Intentar usar loader externo (secrets_loader.py). Si no existe, usar fallback.
+# =============================================================================
+try:
+    # Si creaste secrets_loader.py con load_google_sheets_secrets, se usará esto.
+    from secrets_loader import load_google_sheets_secrets  # type: ignore
+except Exception:
+    # Fallback interno para cargar secretos desde st.secrets o variables de entorno
+    class _SecretsError(RuntimeError):
+        pass
+
+    def _from_st_secrets():
+        # Formato A: bloque TOML [google_sheets]
+        if "google_sheets" in st.secrets:
+            cfg = dict(st.secrets["google_sheets"])
+            sheet_name = st.secrets.get("google_sheets_name", "openalex_logs")
+            return sheet_name, cfg
+        # Formato B: JSON entero en una sola clave
+        if "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets:
+            cfg = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
+            sheet_name = st.secrets.get("google_sheets_name", "openalex_logs")
+            return sheet_name, cfg
+        raise _SecretsError(
+            "No se encontraron claves 'google_sheets' ni 'GOOGLE_SERVICE_ACCOUNT_JSON' en st.secrets."
+        )
+
+    def _from_env():
+        # Permite correr en entornos donde los secretos llegan por env vars
+        if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"):
+            cfg = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+            sheet_name = os.getenv("GOOGLE_SHEETS_NAME", "openalex_logs")
+            return sheet_name, cfg
+        raise _SecretsError("Sin variables de entorno para Google (GOOGLE_SERVICE_ACCOUNT_JSON).")
+
+    def load_google_sheets_secrets():
+        # Prioriza st.secrets y cae a variables de entorno
+        try:
+            return _from_st_secrets()
+        except Exception:
+            return _from_env()
 
 
 class OpenAlexLogger:
@@ -52,31 +96,25 @@ class OpenAlexLogger:
     def _initialize(self):
         """Inicializa la conexión a Google Sheets (lazy loading)"""
         try:
-            # Verificar que existen los secrets
-            if "google_sheets" not in st.secrets:
-                self.enabled = False
-                return
-
-            # Cargar credenciales desde Streamlit secrets
-            creds_dict = dict(st.secrets["google_sheets"])
+            # Cargar secretos de forma robusta (st.secrets, JSON embebido o env vars)
+            spreadsheet_name, creds_dict = load_google_sheets_secrets()
 
             # Scopes necesarios para Google Sheets
             scopes = [
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive'
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive",
             ]
 
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             self.client = gspread.authorize(creds)
 
             # Abrir la hoja (debe existir previamente)
-            spreadsheet_name = st.secrets.get("google_sheets_name", "openalex_logs")
             self.sheet = self.client.open(spreadsheet_name).sheet1
 
             self._initialized = True
 
         except Exception as e:
-            # Logging deshabilitado si falla la inicialización
+            # Logging deshabilitado si falla la inicialización (no rompe la UI)
             self.enabled = False
             print(f"⚠️ Logger deshabilitado: {e}")
 
@@ -85,7 +123,7 @@ class OpenAlexLogger:
         query: str,
         search_params: Dict[str, Any],
         results_df: Any,  # pandas DataFrame
-        pdf_stats: Optional[Dict[str, int]] = None
+        pdf_stats: Optional[Dict[str, int]] = None,
     ):
         """
         Registra una búsqueda realizada
@@ -116,12 +154,20 @@ class OpenAlexLogger:
         try:
             # Calcular estadísticas de resultados
             total_found = len(results_df)
-            with_abstract = int(results_df['abstract'].notna().sum())
-            open_access_count = int(results_df['open_access'].sum())
+            with_abstract = int(results_df["abstract"].notna().sum()) if total_found else 0
 
-            # Calcular promedio de citaciones (manejar valores NaN)
-            citations = results_df['citations'].astype(float)
-            avg_citations = round(float(citations.mean()), 2) if total_found > 0 else 0
+            # Columna open_access puede ser booleana; si no existe, tomar 0
+            if "open_access" in results_df.columns:
+                open_access_count = int(results_df["open_access"].fillna(False).astype(bool).sum())
+            else:
+                open_access_count = 0
+
+            # Calcular promedio de citaciones (manejar valores NaN / tipos)
+            if "citations" in results_df.columns and total_found:
+                citations = results_df["citations"].astype(float)
+                avg_citations = round(float(citations.mean()), 2)
+            else:
+                avg_citations = 0.0
 
             # Generar session ID anónimo
             session_id = self._get_session_id()
@@ -136,12 +182,12 @@ class OpenAlexLogger:
 
                 # Query y parámetros
                 str(query)[:500],  # Limitar longitud
-                search_params.get('search_type', 'N/A'),
-                search_params.get('max_results', 0),
-                search_params.get('open_access_filter', 'all'),
-                search_params.get('year_from', ''),
-                search_params.get('year_to', ''),
-                search_params.get('sort_by', 'relevance_score:desc'),
+                search_params.get("search_type", "N/A"),
+                search_params.get("max_results", 0),
+                search_params.get("open_access_filter", "all"),
+                search_params.get("year_from", ""),
+                search_params.get("year_to", ""),
+                search_params.get("sort_by", "relevance_score:desc"),
 
                 # Resultados agregados
                 total_found,
@@ -151,15 +197,15 @@ class OpenAlexLogger:
 
                 # PDFs (si se intentó descargar)
                 bool(pdf_stats),
-                pdf_stats.get('downloaded', 0) if pdf_stats else 0,
-                pdf_stats.get('failed', 0) if pdf_stats else 0,
-                pdf_stats.get('no_pdf', 0) if pdf_stats else 0,
-                pdf_stats.get('total', 0) if pdf_stats else 0,
+                (pdf_stats or {}).get("downloaded", 0),
+                (pdf_stats or {}).get("failed", 0),
+                (pdf_stats or {}).get("no_pdf", 0),
+                (pdf_stats or {}).get("total", 0),
             ]
 
             # Escribir a Google Sheets (no bloquea UI en caso de error)
             if self._initialized:
-                self.sheet.append_row(row, value_input_option='USER_ENTERED')
+                self.sheet.append_row(row, value_input_option="USER_ENTERED")
 
         except Exception as e:
             # Silencioso: no romper la app si falla el logging
@@ -172,13 +218,13 @@ class OpenAlexLogger:
         Returns:
             Hash SHA256 de 16 caracteres (no identificable personalmente)
         """
-        if 'anonymous_session_id' not in st.session_state:
+        if "anonymous_session_id" not in st.session_state:
             # Generar hash basado en timestamp + bytes aleatorios
             raw_data = f"{datetime.now().timestamp()}{os.urandom(16).hex()}"
             hash_hex = hashlib.sha256(raw_data.encode()).hexdigest()
-            st.session_state['anonymous_session_id'] = hash_hex[:16]
+            st.session_state["anonymous_session_id"] = hash_hex[:16]
 
-        return st.session_state['anonymous_session_id']
+        return st.session_state["anonymous_session_id"]
 
     @staticmethod
     def create_spreadsheet_header():
@@ -190,28 +236,28 @@ class OpenAlexLogger:
             Lista con nombres de columnas
         """
         return [
-            'timestamp',
-            'session_id',
-            'query',
-            'search_type',
-            'max_results',
-            'open_access_filter',
-            'year_from',
-            'year_to',
-            'sort_by',
-            'total_found',
-            'with_abstract',
-            'open_access_count',
-            'avg_citations',
-            'pdf_download_attempted',
-            'pdfs_downloaded',
-            'pdfs_failed',
-            'pdfs_no_available',
-            'pdfs_total_processed'
+            "timestamp",
+            "session_id",
+            "query",
+            "search_type",
+            "max_results",
+            "open_access_filter",
+            "year_from",
+            "year_to",
+            "sort_by",
+            "total_found",
+            "with_abstract",
+            "open_access_count",
+            "avg_citations",
+            "pdf_download_attempted",
+            "pdfs_downloaded",
+            "pdfs_failed",
+            "pdfs_no_available",
+            "pdfs_total_processed",
         ]
 
 
-# Función helper para uso simple
+# Función helper para uso simple (API estable)
 def log_search_event(query, search_params, results_df, pdf_stats=None):
     """
     Helper function para logging simple
@@ -226,4 +272,3 @@ def log_search_event(query, search_params, results_df, pdf_stats=None):
     except Exception:
         # Completamente silencioso si falla
         pass
-
