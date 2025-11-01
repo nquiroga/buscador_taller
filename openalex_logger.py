@@ -108,8 +108,13 @@ class OpenAlexLogger:
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             self.client = gspread.authorize(creds)
 
-            # Abrir la hoja (debe existir previamente)
-            self.sheet = self.client.open(spreadsheet_name).sheet1
+            # Prioriza abrir por KEY; si no, por NAME
+            sheet_key = st.secrets.get("google_sheets_key", "").strip()
+            if sheet_key:
+                self.sheet = self.client.open_by_key(sheet_key).sheet1
+            else:
+                # cae al nombre (mantiene compatibilidad)
+                self.sheet = self.client.open(spreadsheet_name).sheet1
 
             self._initialized = True
 
@@ -272,3 +277,4 @@ def log_search_event(query, search_params, results_df, pdf_stats=None):
     except Exception:
         # Completamente silencioso si falla
         pass
+
