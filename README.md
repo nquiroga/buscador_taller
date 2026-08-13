@@ -1,234 +1,89 @@
-# 📚 Búsqueda Académica Avanzada - OpenAlex
+# Buscador académico OpenAlex → NotebookLM
 
-**Seminario de tesis - Etapa Avanzada. 2025**
+Aplicación Streamlit para un taller de búsqueda académica. Consulta el índice abierto de OpenAlex, exporta metadatos y prepara pequeños lotes de PDFs de acceso abierto para trabajar en NotebookLM.
 
-Aplicación web interactiva para realizar búsquedas académicas avanzadas usando la API gratuita de OpenAlex, con soporte para operadores booleanos y exportación optimizada para NotebookLM.
+## Qué hace
 
-## 🚀 Características
+- Busca hasta 500 obras por palabras clave, años y orden (relevancia, citas o fecha).
+- Recupera metadatos normalizados: autores, fuente, año, DOI, OpenAlex ID, estado OA, licencia, versión y URL de origen.
+- Exporta resultados como CSV y como Markdown.
+- Descarga, como máximo, 20 PDFs por lote desde URLs de PDF que OpenAlex declara abiertas.
+- Empaqueta los archivos junto con un manifiesto.csv de procedencia.
+- Limita cada PDF a 25 MB y comprueba que el recurso recibido sea realmente un PDF.
 
-- ✅ **Búsquedas Booleanas Avanzadas**: Soporte completo para operadores AND, OR, NOT
-- ✅ **Hasta 500 resultados por búsqueda**: Límite configurable
-- ✅ **Exportación a Markdown**: Formato optimizado para NotebookLM
-- ✅ **Exportación a CSV**: Para análisis en Excel/Python
-- ✅ **Interfaz intuitiva**: Con guía de uso integrada
-- ✅ **Tres modos de búsqueda**: Título y Abstract, General, Solo Título
-- ✅ **Visualización detallada**: Vista de tabla + detalle individual
-- ✅ **100% Gratuito**: Sin necesidad de API keys o suscripciones
+No rastrea páginas DOI ni intenta eludir paywalls. Que una URL sea accesible no reemplaza la comprobación de licencia, versión y condiciones del sitio de origen.
 
-## 📋 Requisitos
+## Configuración de claves
 
-- Python 3.8 o superior
-- Conexión a internet
+La aplicación funciona con el acceso básico de OpenAlex aun sin clave. Para el uso en clase se recomienda una clave gratuita: aumenta sustancialmente el cupo diario y evita compartir una credencial en el navegador.
 
-## 🔧 Instalación Local
+Nunca subas una clave a GitHub. El repositorio ignora .streamlit/secrets.toml y sólo incluye la plantilla segura [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example).
 
-1. Clone el repositorio o descargue los archivos:
-```bash
-git clone [tu-repositorio]
-cd red_peronismo
-```
+### Desarrollo local
 
-2. Instale las dependencias:
-```bash
-pip install -r requirements.txt
-```
+1. Copiá la plantilla a .streamlit/secrets.toml.
+2. Completá los valores, sin comillas adicionales:
 
-3. Ejecute la aplicación:
-```bash
+~~~
+OPENALEX_API_KEY = "tu_clave_privada_de_openalex"
+OPENALEX_MAILTO = "tu-correo-institucional@ejemplo.edu"
+~~~
+
+3. Confirmá antes de hacer git add:
+
+~~~
+git status --ignored
+~~~
+
+El archivo secrets.toml debe figurar como ignorado y jamás como archivo a confirmar.
+
+### Streamlit Community Cloud
+
+1. Abrí la aplicación desplegada.
+2. En **App settings**, abrí **Secrets** (o, al crear la app, **Advanced settings**).
+3. Pegá el mismo bloque TOML anterior y guardá.
+4. Streamlit reinicia la aplicación con el secreto disponible como st.secrets.
+
+El secreto queda en la configuración de Streamlit, no en el repositorio público. Si una clave se publicó por error, revocala y creá otra antes de continuar.
+
+## Instalación y ejecución
+
+~~~
+git clone https://github.com/nquiroga/buscador_taller.git
+cd buscador_taller
+python -m pip install -r requirements.txt
 streamlit run app_streamlit.py
-```
+~~~
 
-4. Abra su navegador en `http://localhost:8501`
+## Flujo recomendado para el taller
 
-## ☁️ Deployment en Streamlit Cloud
+1. Formular una consulta amplia y revisar relevancia, fecha, autorías y fuente.
+2. Acotar por años y/o ordenar por citas o actualidad.
+3. Descargar primero el CSV: es el registro bibliográfico de la búsqueda.
+4. Preparar un lote pequeño de PDFs y leer el manifiesto.csv.
+5. Revisar manualmente los textos pertinentes.
+6. Subir a NotebookLM sólo los PDFs seleccionados y, si sirve, el manifiesto como contexto.
 
-### Paso 1: Preparar el repositorio en GitHub
+El ZIP se crea temporalmente para la sesión y no constituye un repositorio ni una garantía de conservación de los archivos.
 
-1. Suba estos archivos a su repositorio de GitHub:
-   - `app_streamlit.py`
-   - `openalex_search.py`
-   - `requirements.txt`
-   - `.streamlit/config.toml` (opcional)
-   - `README_STREAMLIT.md`
+## Campos del manifiesto
 
-### Paso 2: Conectar con Streamlit Cloud
+| Campo | Uso |
+| --- | --- |
+| doi, openalex_id | Identificadores persistentes para verificar y citar. |
+| oa_pdf_url, oa_landing_url | Procedencia del archivo y página de origen. |
+| license, pdf_version, oa_status | Señales para revisar condiciones de reutilización y versión. |
+| download_status, downloaded_file | Resultado técnico de la descarga. |
 
-1. Vaya a [share.streamlit.io](https://share.streamlit.io)
-2. Inicie sesión con su cuenta de GitHub
-3. Click en "New app"
-4. Configure:
-   - **Repository**: Seleccione su repositorio
-   - **Branch**: `main` (o su rama principal)
-   - **Main file path**: `app_streamlit.py`
-5. Click en "Deploy"
+## Límites y criterios
 
-### Paso 3: Configuración Avanzada (Opcional)
+- OpenAlex es un índice bibliográfico; no es un repositorio de texto completo.
+- El filtro de PDF reduce resultados a obras con URL de PDF reportada por OpenAlex; puede dejar afuera publicaciones pertinentes sin PDF declarado.
+- La licencia puede no estar informada aunque el archivo sea OA: activá el filtro de licencia sólo si ese requisito es imprescindible.
+- La exportación de metadatos no sustituye los datos de citación de la revista ni la lectura crítica del texto.
 
-Si necesita configuración adicional, cree un archivo `.streamlit/secrets.toml`:
+## Referencias técnicas
 
-```toml
-# Agregar si necesita configuraciones secretas en el futuro
-# Por ahora no es necesario
-```
-
-## 📖 Guía de Uso
-
-### Operadores Booleanos
-
-La aplicación soporta los siguientes operadores (deben estar en MAYÚSCULAS):
-
-- **AND**: Ambos términos deben aparecer
-  ```
-  peronismo AND argentina
-  ```
-
-- **OR**: Al menos uno debe aparecer
-  ```
-  "Juan Perón" OR "Eva Perón"
-  ```
-
-- **NOT**: Excluye resultados
-  ```
-  peronismo NOT militar
-  ```
-
-- **Paréntesis**: Controla el orden de operaciones
-  ```
-  (peronismo OR justicialismo) AND argentina
-  ```
-
-### Tipos de Búsqueda
-
-1. **Título y Abstract**: Busca en el título y resumen del artículo (recomendado)
-2. **General**: Busca en todo el documento disponible
-3. **Solo Título**: Búsqueda únicamente en títulos
-
-### Frases Exactas
-
-Use comillas dobles para buscar frases exactas:
-```
-"historia argentina contemporánea"
-```
-
-### Búsqueda Multilingüe
-
-Separe términos con comas para búsqueda OR automática:
-```
-peronismo, peronism, justicialismo
-```
-Se convierte automáticamente a: `peronismo OR peronism OR justicialismo`
-
-## 📊 Exportación de Resultados
-
-### Formato CSV
-- Ideal para análisis en Excel, Python, R
-- Incluye todas las columnas: título, autores, publicación, año, DOI, abstract, citaciones, etc.
-
-### Formato Markdown (para NotebookLM)
-- Formato optimizado para cargar en Google NotebookLM
-- Estructura clara con título, autores, abstract y metadata
-- Un documento completo listo para análisis de IA
-
-## 🎯 Ejemplos de Consultas
-
-### Ejemplo 1: Búsqueda Simple
-```
-peronismo
-```
-
-### Ejemplo 2: Búsqueda Multilingüe
-```
-peronismo, peronism
-```
-
-### Ejemplo 3: Búsqueda Booleana
-```
-(peronismo OR justicialismo) AND argentina
-```
-
-### Ejemplo 4: Excluir Términos
-```
-peronismo NOT militar
-```
-
-### Ejemplo 5: Frase Exacta + Booleano
-```
-"Juan Perón" AND (política OR economía)
-```
-
-## 📈 Capacidades y Límites
-
-### ✅ Capacidades
-- Búsqueda en 240+ millones de trabajos académicos
-- 100,000 requests/día (gratuitos)
-- Sin necesidad de API key
-- Soporte multilingüe
-- Deduplicación automática
-- Búsqueda completa en abstracts
-
-### ⚠️ Límites
-- Máximo 500 resultados por búsqueda (límite de la app)
-- Aproximadamente 50% de trabajos tienen abstract completo
-- No incluye texto completo de artículos (solo metadata)
-
-## 🛠️ Estructura del Proyecto
-
-```
-red_peronismo/
-├── app_streamlit.py          # Aplicación principal Streamlit
-├── openalex_search.py         # Módulo de búsqueda OpenAlex
-├── requirements.txt           # Dependencias Python
-├── .streamlit/
-│   └── config.toml           # Configuración de Streamlit
-├── README_STREAMLIT.md       # Esta documentación
-└── README_OpenAlex.md        # Documentación de la API
-```
-
-## 🔍 Solución de Problemas
-
-### Error: "Module not found"
-```bash
-pip install -r requirements.txt
-```
-
-### La aplicación no inicia
-Verifique que está usando Python 3.8+:
-```bash
-python --version
-```
-
-### No se encuentran resultados
-- Verifique que los operadores booleanos estén en MAYÚSCULAS (AND, OR, NOT)
-- Pruebe con términos más generales
-- Revise la sintaxis de su consulta
-
-### Error de conexión
-- Verifique su conexión a internet
-- OpenAlex API puede estar temporalmente no disponible
-
-## 📚 Recursos Adicionales
-
-- [Documentación de OpenAlex API](https://docs.openalex.org/)
-- [Documentación de Streamlit](https://docs.streamlit.io/)
-- [OpenAlex API Tutorials](https://github.com/ourresearch/openalex-api-tutorials)
-- [NotebookLM de Google](https://notebooklm.google/)
-
-## 🤝 Contribuciones
-
-Este proyecto fue desarrollado para el Seminario de tesis - Etapa Avanzada. 2025.
-
-## 📄 Licencia
-
-Este proyecto utiliza:
-- **OpenAlex API**: Datos bajo licencia CC0 (dominio público)
-- **Código**: Disponible para uso académico
-
-## 📧 Soporte
-
-Para reportar problemas o sugerencias, consulte la documentación de OpenAlex o Streamlit.
-
----
-
-**Desarrollado con ❤️ para investigadores académicos**
-
-*Powered by OpenAlex API - Una alternativa gratuita y abierta para la investigación académica*
+- [API de OpenAlex](https://help.openalex.org/api/)
+- [Filtros de OpenAlex](https://help.openalex.org/api/filtering/)
+- [Gestión de secretos en Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
