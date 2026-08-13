@@ -162,9 +162,10 @@ def _generate_descriptive_filename(index, title, author, doi, max_total_length=1
     return filename
 
 class OpenAlexSearcher:
-    def __init__(self, timeout=25, mailto=None):
+    def __init__(self, timeout=25, mailto=None, api_key=None):
         self.timeout = timeout
         self.mailto = mailto or os.getenv("OPENALEX_MAILTO")
+        self.api_key = api_key or os.getenv("OPENALEX_API_KEY")
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "OpenAlex-Streamlit/1.4 (+mailto)",
@@ -176,6 +177,8 @@ class OpenAlexSearcher:
         p = {k: v for k, v in params.items() if v not in (None, "")}
         if self.mailto:
             p["mailto"] = self.mailto
+        if self.api_key:
+            p["api_key"] = self.api_key
         url = f"{OPENALEX_BASE}?{urlencode(p, doseq=True)}"
 
         for delay in (0, 1.0, 2.0):

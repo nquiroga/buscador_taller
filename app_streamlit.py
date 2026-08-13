@@ -7,8 +7,10 @@ Permite búsquedas avanzadas con operadores booleanos y exportación a Markdown
 import streamlit as st
 import pandas as pd
 from openalex_search import OpenAlexSearcher
+from semantic_scholar_search import SemanticScholarSearcher
 from openalex_logger import OpenAlexLogger
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import io
 import zipfile
 import os
@@ -233,28 +235,64 @@ def convert_to_markdown(results_df):
 
     return md_content
 
+
+def deduplicate_by_doi(results):
+    """Evita duplicados exactos entre fuentes sin descartar obras sin DOI."""
+    unique_results = []
+    seen_dois = set()
+    for result in results:
+        doi = (result.get("doi") or "").strip().lower()
+        if doi and doi in seen_dois:
+            continue
+        if doi:
+            seen_dois.add(doi)
+        unique_results.append(result)
+    return unique_results
+
 # Realizar búsqueda
 if search_button:
     if not query:
         st.error("⚠️ Por favor ingrese una consulta de búsqueda")
     else:
-        with st.spinner("🔄 Buscando en OpenAlex..."):
+        with st.spinner("🔄 Buscando en OpenAlex y Semantic Scholar..."):
             try:
-                # Inicializar el buscador
-                searcher = OpenAlexSearcher()
+                results = []
+                source_errors = []
 
-                # Realizar búsqueda
-                results = searcher.get_all_results(
-                    query=query,
-                    max_results=max_results,
-                    search_type=search_type,
-                    open_access_filter=open_access_filter,
-                    year_from=year_from,
-                    year_to=year_to
-                )
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures = {
+                        executor.submit(
+                            OpenAlexSearcher().get_all_results,
+                            query=query,
+                            max_results=max_results,
+                            search_type=search_type,
+                            open_access_filter=open_access_filter,
+                            year_from=year_from,
+                            year_to=year_to,
+                        ): "OpenAlex",
+                        executor.submit(
+                            SemanticScholarSearcher().get_all_results,
+                            query=query,
+                            max_results=max_results,
+                            open_access_filter=open_access_filter,
+                            year_from=year_from,
+                            year_to=year_to,
+                        ): "Semantic Scholar",
+                    }
+                    for future in as_completed(futures):
+                        source = futures[future]
+                        try:
+                            source_results = future.result()
+                            for result in source_results:
+                                result.setdefault("source", source)
+                            results.extend(source_results)
+                        except Exception as error:
+                            source_errors.append(f"{source}: {error}")
+
+                results = deduplicate_by_doi(results)
 
                 if not results:
-                    st.warning("No se encontraron resultados para esta búsqueda")
+                    st.warning("No se encontraron resultados en OpenAlex ni en Semantic Scholar")
                 else:
                     # Convertir a DataFrame
                     df = pd.DataFrame(results)
@@ -289,6 +327,11 @@ if search_button:
 
                     st.success(f"✅ Se encontraron {len(df)} resultados")
                     st.info(f"📁 CSV guardado automáticamente: {csv_filename}")
+                    if source_errors:
+                        st.warning("Una fuente no respondió; se muestran los resultados de la otra.")
+                        with st.expander("Detalle técnico de la fuente que falló"):
+                            for source_error in source_errors:
+                                st.text(source_error)
 
             except Exception as e:
                 st.error(f"❌ Error durante la búsqueda: {str(e)}")
@@ -515,7 +558,6 @@ if 'results' in st.session_state and st.session_state['results'] is not None:
 # Footer
 st.divider()
 st.caption("Taller NotebookLM - 2025 | Datos de OpenAlex API")
-
 
 
 
